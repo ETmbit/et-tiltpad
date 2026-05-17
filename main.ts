@@ -271,11 +271,17 @@ namespace EtTiltpad {
     let curid = 0
 
     export function handleTilt(value: number) {
-        curid = value - Math.floor(value / 500)
+        // angle values are divided by 10, ranging from -18 to +18
+        // transformed by +20 to range from 2 to 38
+        // hi'byte' 40 is for pitch, lo'byte' 40 is for roll
+        // thus the values of a single tiltpad range to 40*40 = 1600
+        // tilpads offset from id * 2000 therefore
+
+        curid = Math.floor(value / 2000)
         if (curid < 0 || curid >= ETtilt.length) return
-        value -= curid * 500
-        let pitch = value - Math.floor(value / 400) - 200
-        let roll = value - (pitch * 400) - 200
+        value -= curid * 2000
+        let pitch = Math.floor(value / 40) - 20
+        let roll = value - (pitch * 40) - 20
         ETtilt[curid] = {Pitch: pitch, Roll: roll}
 
         switch (curid) {
