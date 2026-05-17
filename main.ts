@@ -76,7 +76,6 @@ interface ETradioMessages {
 let ETradioMsg: { [id: string]: ETradioMessages } = {}
 
 radio.onReceivedString(function (chunk: string) {
-
     let parts = chunk.split("|")
     if (parts.length != 3) return
     let id = parts[0]
@@ -277,13 +276,15 @@ namespace EtTiltpad {
         // thus the values of a single tiltpad range to 40*40 = 1600
         // tilpads offset from id * 2000 therefore
 
-        curid = Math.floor(value / 2000)
-        if (curid < 0 || curid >= ETtilt.length) return
-        value -= curid * 2000
-        let pitch = Math.floor(value / 40) - 20
-        let roll = value - (pitch * 40) - 20
-        ETtilt[curid] = {Pitch: pitch, Roll: roll}
+        const curid = Math.floor(value / 2000);
+        if (curid < 0 || curid >= ETtilt.length) return;
 
+        const local = value % 2000;
+
+        const pitch = Math.floor(local / 40) - 20;
+        const roll = (local % 40) - 20;
+
+        ETtilt[curid] = {Pitch: pitch, Roll: roll}
         switch (curid) {
             case 0: if (etTiltpad0Handler) etTiltpad0Handler(); break
             case 1: if (etTiltpad1Handler) etTiltpad1Handler(); break
@@ -382,3 +383,6 @@ namespace EtTiltpad {
 /////////////////
 // END INCLUDE //
 /////////////////
+
+
+EtTiltpad.setTiltpadCount(9)
