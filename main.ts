@@ -213,14 +213,37 @@ const ETYAW = "Y"
 const ETBUTTON = "B"
 
 enum ETtouchButton {
+    //% block=""
+    //% block.loc.nl=""
     Left,
+    //% block=""
+    //% block.loc.nl=""
     A,
+    //% block=""
+    //% block.loc.nl=""
     B,
+    //% block=""
+    //% block.loc.nl=""
     C,
+    //% block=""
+    //% block.loc.nl=""
     D,
+    //% block=""
+    //% block.loc.nl=""
     Right,
 }
 
+enum ETtouchTilt {
+    //% block=""
+    //% block.loc.nl="voor- of achterover helt"
+    Pitch,
+    //% block=""
+    //% block.loc.nl="naar links of rechts helt"
+    Roll,
+    //% block=""
+    //% block.loc.nl="om z'n as draait"
+    Yaw,
+}
 function etTiltpadRadio(msg: string) {
     let parts = msg.split(";")
     if (parts.length != 3) return
@@ -311,32 +334,32 @@ namespace EtTiltpad {
     }
 
     //% color="#802080"
-    //% block="when button %id of touchpad %num is touched"
-    //% block.loc.nl="wanneer knop %id van touchpad %num wordt aangeraakt"
+    //% block="when button %but of touchpad %num is touched"
+    //% block.loc.nl="wanneer knop %but van touchpad %num wordt aangeraakt"
     //% num.min=1 num.max=10
-    export function onButton(but: number, num: number, code: () => void): void {
+    export function onButton(but: ETtouchButton, num: number, code: () => void): void {
         if (num < 1 || num > 10) return
         num -= 1
         switch (but) {
-            case 0: onLeftHandler[num] = code; break
-            case 1: onAHandler[num] = code; break
-            case 2: onBHandler[num] = code; break
-            case 3: onCHandler[num] = code; break
-            case 4: onDHandler[num] = code; break
-            case 5: onRightHandler[num] = code; break
+            case ETtouchButton.Left: onLeftHandler[num] = code; break
+            case ETtouchButton.A: onAHandler[num] = code; break
+            case ETtouchButton.B: onBHandler[num] = code; break
+            case ETtouchButton.C: onCHandler[num] = code; break
+            case ETtouchButton.D: onDHandler[num] = code; break
+            case ETtouchButton.Right: onRightHandler[num] = code; break
         }
     }
 
     //% color="#802080"
-    //% block="when tiltpad %num tilts %dir"
-    //% block.loc.nl="wanneer tiltpad %num %dir helt"
-    export function onTilt(num: number, dir: number, code: () => void): void {
+    //% block="when tiltpad %num %dir"
+    //% block.loc.nl="wanneer tiltpad %num %dir"
+    export function onTilt(num: number, tilt: ETtouchTilt, code: () => void): void {
         if (num < 1 || num > 10) return
         num -= 1
-        switch (dir) {
-            case 0: onPitchHandler[num] = code; break
-            case 1: onRollHandler[num] = code; break
-            case 2: onYawHandler[num] = code; break
+        switch (tilt) {
+            case ETtouchTilt.Pitch: onPitchHandler[num] = code; break
+            case ETtouchTilt.Roll: onRollHandler[num] = code; break
+            case ETtouchTilt.Yaw: onYawHandler[num] = code; break
         }
     }
 
