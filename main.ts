@@ -213,35 +213,35 @@ const ETYAW = "Y"
 const ETBUTTON = "B"
 
 enum ETtouchButton {
-    //% block=""
-    //% block.loc.nl=""
+    //% block="left"
+    //% block.loc.nl="linker"
     Left,
-    //% block=""
-    //% block.loc.nl=""
+    //% block="a-"
+    //% block.loc.nl="a-"
     A,
-    //% block=""
-    //% block.loc.nl=""
+    //% block="b-"
+    //% block.loc.nl="b-"
     B,
-    //% block=""
-    //% block.loc.nl=""
+    //% block="c-"
+    //% block.loc.nl="c-"
     C,
-    //% block=""
-    //% block.loc.nl=""
+    //% block="d-"
+    //% block.loc.nl="d-"
     D,
-    //% block=""
-    //% block.loc.nl=""
+    //% block="right"
+    //% block.loc.nl="rechter"
     Right,
 }
 
 enum ETtouchTilt {
-    //% block=""
-    //% block.loc.nl="voor- of achterover helt"
+    //% block="pitch"
+    //% block.loc.nl="pitch"
     Pitch,
-    //% block=""
-    //% block.loc.nl="naar links of rechts helt"
+    //% block="roll"
+    //% block.loc.nl="roll"
     Roll,
-    //% block=""
-    //% block.loc.nl="om z'n as draait"
+    //% block="yaw"
+    //% block.loc.nl="yaw"
     Yaw,
 }
 function etTiltpadRadio(msg: string) {
@@ -335,7 +335,7 @@ namespace EtTiltpad {
 
     //% color="#802080"
     //% block="when button %but of touchpad %num is touched"
-    //% block.loc.nl="wanneer knop %but van touchpad %num wordt aangeraakt"
+    //% block.loc.nl="wanneer de %but knop van tiltpad %num wordt aangeraakt"
     //% num.min=1 num.max=10
     export function onButton(but: ETtouchButton, num: number, code: () => void): void {
         if (num < 1 || num > 10) return
@@ -351,9 +351,9 @@ namespace EtTiltpad {
     }
 
     //% color="#802080"
-    //% block="when tiltpad %num %dir"
-    //% block.loc.nl="wanneer tiltpad %num %dir"
-    export function onTilt(num: number, tilt: ETtouchTilt, code: () => void): void {
+    //% block="when the %tilt of tiltpad %num changes"
+    //% block.loc.nl="wanneer de %tilt van tiltpad %num wijzigt"
+    export function onTilt(tilt: ETtouchTilt, num: number, code: () => void): void {
         if (num < 1 || num > 10) return
         num -= 1
         switch (tilt) {
