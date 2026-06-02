@@ -1,5 +1,5 @@
 /*
-File:       github.com/ETmbit/et-tiltpad.ts
+File:       github.com/ETmbit/ettiltpad.ts
 Version:	2026-1
 Copyright:  ElecTricks, 2026
 License:    GNU GPL 3 or later
@@ -14,8 +14,8 @@ Depends on: None
 
 // the micro:bit radio buffer size is 19 bytes only
 // therefore, messages are sent in chunks
-// the chunk format is: id|ix|chunk
-// the final chunk has ix=-1 and chunk=ack_id
+// the chunk format is: id|num|chunk
+// the final chunk has num=-1 and chunk=ack_id
 // a receiver 
 
 //##### GROUP HANDLING #####\\
@@ -30,8 +30,8 @@ let ETgroupHandlers: ((group: number) => void)[] = []
 function etHandleGroup() {
     basic.showNumber(ETgroup)
     if (ETgroupHandlers.length) {
-        for (let ix = 0; ix < ETgroupHandlers.length; ix++)
-            ETgroupHandlers[ix](ETgroup)
+        for (let num = 0; num < ETgroupHandlers.length; num++)
+            ETgroupHandlers[num](ETgroup)
     }
     else
         basic.showIcon(IconNames.Yes)
@@ -79,7 +79,7 @@ radio.onReceivedString(function (chunk: string) {
     let parts = chunk.split("|")
     if (parts.length != 3) return
     let id = parts[0]
-    let ix = +parts[1]
+    let num = +parts[1]
     let msg = parts[2]
 
     // create a buffer for id if not existing
@@ -89,7 +89,7 @@ radio.onReceivedString(function (chunk: string) {
     // (1) send ACK
     // (2) store message or call handler
     // see: etradio.send()
-    if (ix === ET_EOM) {
+    if (num === ET_EOM) {
         // (1) msg contains msg id
         msg = id + "|" + ET_ACK.toString() + "|" + msg
         radio.sendString(msg)
@@ -106,15 +106,15 @@ radio.onReceivedString(function (chunk: string) {
     // ACK handling (sender side)
     // (1) clear the ACK flag when acknowledged
     // see: etradio.send()
-    if (ix === ET_ACK) {
-        if (ETradioMsg[id] && ((ix = ETradioMsg[id].sent.indexOf(msg)) >= 0))
+    if (num === ET_ACK) {
+        if (ETradioMsg[id] && ((num = ETradioMsg[id].sent.indexOf(msg)) >= 0))
             // (1)
-            ETradioMsg[id].sent.splice(ix, 1)
+            ETradioMsg[id].sent.splice(num, 1)
         return
     }
 
     // CHUNK handling (receiver side)
-    ETradioMsg[id].chunks[ix] = msg
+    ETradioMsg[id].chunks[num] = msg
 })
 
 namespace etradio {
@@ -133,7 +133,7 @@ namespace etradio {
         // messages are broadcasted
 
         let len = Math.max(1, 15 - id.length)
-        let ix = 0
+        let num = 0
         let chunk = ""
         let ack_id = control.millis().toString() + Math.randomRange(0, 999).toString()
         ack_id = ack_id.substr(0, len)
@@ -143,11 +143,11 @@ namespace etradio {
 
         // send message in chunks
         while (msg.length > 0) {
-            chunk = id + "|" + ix.toString() + "|" + msg.substr(0, len)
+            chunk = id + "|" + num.toString() + "|" + msg.substr(0, len)
             msg = msg.substr(len)
             radio.sendString(chunk)
             basic.pause(1)
-            ix += 1
+            num += 1
         }
 
         // (1) raise ACK flag
@@ -171,8 +171,8 @@ namespace etradio {
             basic.pause(1)
 
         // (4)
-        if ((ix = ETradioMsg[id].sent.indexOf(ack_id)) >= 0)
-            ETradioMsg[id].sent.splice(ix, 1)
+        if ((num = ETradioMsg[id].sent.indexOf(ack_id)) >= 0)
+            ETradioMsg[id].sent.splice(num, 1)
     }
 
     export function available(id: string): boolean {
@@ -200,189 +200,234 @@ namespace etradio {
 //  END INCLUDE  //
 ///////////////////
 
-/////////////////
-//  INCLUDE    //
-//  tiltpad.ts //
-/////////////////
+///////////////////
+//  INCLUDE      //
+//  ettiltpad.ts //
+///////////////////
 
 const ET_TILTPADID = "TP"
 
-enum ETtiltDir {
-    //% block=""
-    //% block.loc.nl="niet"
-    None,
-    //% block="up"
-    //% block.loc.nl="omhoog"
-    Up,
-    //% block="down"
-    //% block.loc.nl="omlaag"
-    Down,
-    //% block="left"
-    //% block.loc.nl="naar links"
+const ETPITCH = "P"
+const ETROLL = "R"
+const ETYAW = "Y"
+const ETBUTTON = "B"
+
+enum ETtouchButton {
     Left,
-    //% block="right"
-    //% block.loc.nl="naar rechts"
+    A,
+    B,
+    C,
+    D,
     Right,
 }
 
-type Tilt = { Pitch: number, Roll: number }
-let ETtilt: Tilt[] = []
-ETtilt.push({Pitch : 0, Roll : 0})
-
-function fromAngle(angle: number): number {
-    // identical calculation to: et-heading.ts
-    while (angle < 0) angle += 360
-    while (angle >= 360) angle -= 360
-    let hd = Math.round(angle / 10) * 10
-    if (hd === 360) hd = 0
-    return hd
+function etTiltpadRadio(msg: string) {
+    let parts = msg.split(";")
+    if (parts.length != 3) return
+    let num = +parts[0]
+    let prm = parts[1]
+    let val = +parts[2]
+    EtTiltpad.handleTilt(num, prm, val)
 }
+etradio.registerMessageHandler(ET_TILTPADID, etTiltpadRadio)
 
-// balance handlers
-let etPitchUpHandler: () => void
-let etPitchDownHandler: () => void
-let etRollLeftHandler: () => void
-let etRollRightHandler: () => void
-let etInBalancedHandler: () => void
-
-let etTiltpad0Handler: () => void
-let etTiltpad1Handler: () => void
-let etTiltpad2Handler: () => void
-let etTiltpad3Handler: () => void
-let etTiltpad4Handler: () => void
-let etTiltpad5Handler: () => void
-let etTiltpad6Handler: () => void
-let etTiltpad7Handler: () => void
-let etTiltpad8Handler: () => void
-let etTiltpad9Handler: () => void
-
-function ETtiltpadRadio(msg: string) {
-    let val = +msg
-    EtTiltpad.handleTilt(val)
-}
-etradio.registerMessageHandler(ET_TILTPADID, ETtiltpadRadio)
-
-//% color="#C4C80E" icon="\uf11b"
+//% color="#C4C80E" icon="\uf065"
 //% block="Tiltpad"
 //% block.loc.nl="Tiltpad"
 namespace EtTiltpad {
 
-    let curid = 0
+    let onPitchHandler: ((value: number) => void)[] = []
+    let onRollHandler: ((value: number) => void)[] = []
+    let onYawHandler: ((value: number) => void)[] = []
+    let onLeftHandler: (() => void)[] = []
+    let onRightHandler: (() => void)[] = []
+    let onAHandler: (() => void)[] = []
+    let onBHandler: (() => void)[] = []
+    let onCHandler: (() => void)[] = []
+    let onDHandler: (() => void)[] = []
 
-    export function handleTilt(value: number) {
-        // angle values are divided by 10, ranging from -18 to +18
-        // transformed by +20 to range from 2 to 38
-        // hi'byte' 40 is for pitch, lo'byte' 40 is for roll
-        // thus the values of a single tiltpad range to 40*40 = 1600
-        // tilpads offset from id * 2000 therefore
+    let pitch: number[] = []
+    let roll: number[] = []
+    let yaw: number[] = []
 
-        const curid = Math.floor(value / 2000);
-        if (curid < 0 || curid >= ETtilt.length) return;
+    onPitchHandler.push(null)
+    onRightHandler.push(null)
+    onYawHandler.push(null)
+    onLeftHandler.push(null)
+    onRightHandler.push(null)
+    onAHandler.push(null)
+    onBHandler.push(null)
+    onCHandler.push(null)
+    onDHandler.push(null)
 
-        const local = value % 2000;
+    pitch.push(999)
+    roll.push(999)
+    yaw.push(999)
 
-        const pitch = Math.floor(local / 40) - 20;
-        const roll = (local % 40) - 20;
-
-        ETtilt[curid] = {Pitch: pitch, Roll: roll}
-        switch (curid) {
-            case 0: if (etTiltpad0Handler) etTiltpad0Handler(); break
-            case 1: if (etTiltpad1Handler) etTiltpad1Handler(); break
-            case 2: if (etTiltpad2Handler) etTiltpad2Handler(); break
-            case 3: if (etTiltpad3Handler) etTiltpad3Handler(); break
-            case 4: if (etTiltpad4Handler) etTiltpad4Handler(); break
-            case 5: if (etTiltpad5Handler) etTiltpad5Handler(); break
-            case 6: if (etTiltpad6Handler) etTiltpad6Handler(); break
-            case 7: if (etTiltpad7Handler) etTiltpad7Handler(); break
-            case 8: if (etTiltpad8Handler) etTiltpad8Handler(); break
-            case 9: if (etTiltpad9Handler) etTiltpad9Handler(); break
+    export function handleTilt(num: number, prm: string, val: number) {
+        if (prm == ETPITCH) {
+            if (num >= 0 && num < onPitchHandler.length && onPitchHandler[num])
+                onPitchHandler[num](val)
         }
-        
-        if ((pitch < 0) && etPitchDownHandler) etPitchDownHandler()
-        if ((pitch > 0) && etPitchUpHandler) etPitchUpHandler()
-        if ((roll < 0) && etRollLeftHandler) etRollLeftHandler()
-        if ((roll > 0) && etRollRightHandler) etRollRightHandler()
+        else
+        if (prm == ETROLL) {
+            if (num >= 0 && num < onRollHandler.length && onRollHandler[num])
+                onRollHandler[num](val)
+        }
+        else
+        if (prm == ETYAW) {
+            if (num >= 0 && num < onYawHandler.length && onYawHandler[num])
+                onYawHandler[num](val)
+        }
+        else
+        if (prm == ETBUTTON) {
+            switch (val) {
+                case ETtouchButton.Left:
+                    if (num >= 0 && num < onLeftHandler.length && onLeftHandler[num])
+                        onLeftHandler[num]()
+                    break
+                case ETtouchButton.Right:
+                    if (num >= 0 && num < onRightHandler.length && onRightHandler[num])
+                        onRightHandler[num]()
+                    break
+                case ETtouchButton.A:
+                    if (num >= 0 && num < onAHandler.length && onAHandler[num])
+                        onAHandler[num]()
+                    break
+                case ETtouchButton.B:
+                    if (num >= 0 && num < onBHandler.length && onBHandler[num])
+                        onBHandler[num]()
+                    break
+                case ETtouchButton.C:
+                    if (num >= 0 && num < onCHandler.length && onCHandler[num])
+                        onCHandler[num]()
+                    break
+                case ETtouchButton.D:
+                    if (num >= 0 && num < onDHandler.length && onDHandler[num])
+                        onDHandler[num]()
+                    break
+            }
+        }
     }
 
     //% color="#802080"
-    //% block="when tiltpad %id tilts"
-    //% block.loc.nl="wanneer tiltpad %id helt"
-    //% id.min=1 id.max=10 id.defl=1
-    export function onTiltpad(id: number, code: () => void): void {
-        switch (id) {
-            case 1: etTiltpad0Handler = code; break
-            case 2: etTiltpad1Handler = code; break
-            case 3: etTiltpad2Handler = code; break
-            case 4: etTiltpad3Handler = code; break
-            case 5: etTiltpad4Handler = code; break
-            case 6: etTiltpad5Handler = code; break
-            case 7: etTiltpad6Handler = code; break
-            case 8: etTiltpad7Handler = code; break
-            case 9: etTiltpad8Handler = code; break
-            case 10: etTiltpad9Handler = code; break
+    //% block="when button %id of touchpad %num is touched"
+    //% block.loc.nl="wanneer knop %id van touchpad %num wordt aangeraakt"
+    //% num.min=1 num.max=10
+    export function onButton(but: number, num: number, code: () => void): void {
+        if (num < 1 || num > 10) return
+        num -= 1
+        switch (but) {
+            case 0: onLeftHandler[num] = code; break
+            case 1: onAHandler[num] = code; break
+            case 2: onBHandler[num] = code; break
+            case 3: onCHandler[num] = code; break
+            case 4: onDHandler[num] = code; break
+            case 5: onRightHandler[num] = code; break
         }
     }
 
     //% color="#802080"
-    //% block="when the tiltpad tilts %dir"
-    //% block.loc.nl="wanneer de tiltpad %dir helt"
-    export function onTilt(dir: ETtiltDir, code: () => void): void {
+    //% block="when tiltpad %num tilts %dir"
+    //% block.loc.nl="wanneer tiltpad %num %dir helt"
+    export function onTilt(num: number, dir: number, code: () => void): void {
+        if (num < 1 || num > 10) return
+        num -= 1
         switch (dir) {
-            case ETtiltDir.Up: etPitchUpHandler = code; break
-            case ETtiltDir.Down: etPitchDownHandler = code; break
-            case ETtiltDir.Up: etPitchUpHandler = code; break
-            case ETtiltDir.Down: etPitchDownHandler = code; break
+            case 0: onPitchHandler[num] = code; break
+            case 1: onRollHandler[num] = code; break
+            case 2: onYawHandler[num] = code; break
         }
     }
 
-    //% block="roll of tiltpad %id"
-    //% block.loc.nl="roll van tiltpad %id"
-    export function readTiltpadRoll(id: number): number {
-        if (id < ETtilt.length)
-            return ETtilt[id].Roll
-        return 999
-    }
-
-    //% block="pitch of tiltpad %id"
-    //% block.loc.nl="pitch van tiltpad %id"
-    export function readTiltpadPitch(id: number): number {
-        if (id < ETtilt.length)
-            return ETtilt[id].Pitch
+    //% block="pitch"
+    //% block.loc.nl="pitch"
+    export function getPitch(): number {
+        if (pitch.length) return pitch[0]
         return 999
     }
 
     //% block="roll"
     //% block.loc.nl="roll"
-    export function readRoll(): number {
-        return ETtilt[0].Roll
+    export function getRoll(): number {
+        if (roll.length) return roll[0]
+        return 999
     }
 
-    //% block="pitch"
-    //% block.loc.nl="pitch"
-    export function readPitch(): number {
-        return ETtilt[0].Pitch
+    //% block="yaw"
+    //% block.loc.nl="yaw"
+    export function getYaw(): number {
+        if (yaw.length) return yaw[0]
+        return 999
     }
 
-    //% block="recent tiltpad"
-    //% block.loc.nl="laatste tiltpad"
-    export function readTiltpad(): number {
-        return curid
+    //% subcategory="Meerdere pads"
+    //% block="pitch of tiltpad %num"
+    //% block.loc.nl="pitch van tiltpad %num"
+    export function getTiltpadPitch(num: number): number {
+        num -= 1
+        if (num >= 0 && num < pitch.length)
+            return pitch[num]
+        return 999
     }
 
-    //% block="the number of tiltpads is %cnt"
-    //% block.loc.nl="het aantal tiltpads is %cnt"
-    //% cnt.min=1 cnt.max=10 cnt.defl=1
+    //% subcategory="Meerdere pads"
+    //% block="roll of tiltpad %num"
+    //% block.loc.nl="roll van tiltpad %num"
+    export function getTiltpadRoll(num: number): number {
+        num -= 1
+        if (num >= 0 && num < roll.length)
+            return roll[num]
+        return 999
+    }
+
+    //% subcategory="Meerdere pads"
+    //% block="yaw of tiltpad %num"
+    //% block.loc.nl="yaw van tiltpad %num"
+    export function getTiltpadYaw(num: number): number {
+        num -= 1
+        if (num >= 0 && num < yaw.length)
+            return yaw[num]
+        return 999
+    }
+
+
+    //% subcategory="Meerdere pads"
+    //% block="use %cnt tiltpads"
+    //% block.loc.nl="gebruik %cnt tiltpads"
+    //% cnt.min=1 cnt.max=10 cnt.defl=2
     export function setTiltpadCount(cnt: number) {
+
         if (cnt < 1) cnt = 1
-        ETtilt = []
-        for (let i = 0; i < cnt; i++)
-            ETtilt.push({Pitch: 0, Roll: 0})
+
+        onPitchHandler.splice(0, onPitchHandler.length)
+        onRollHandler.splice(0, onRollHandler.length)
+        onYawHandler.splice(0, onYawHandler.length)
+        onLeftHandler.splice(0, onLeftHandler.length)
+        onRightHandler.splice(0, onRightHandler.length)
+        onAHandler.splice(0, onAHandler.length)
+        onBHandler.splice(0, onBHandler.length)
+        onCHandler.splice(0, onCHandler.length)
+        onDHandler.splice(0, onDHandler.length)
+
+        for (let i = 0; i < cnt; i++) {
+            onPitchHandler.push(null)
+            onRightHandler.push(null)
+            onYawHandler.push(null)
+            onLeftHandler.push(null)
+            onRightHandler.push(null)
+            onAHandler.push(null)
+            onBHandler.push(null)
+            onCHandler.push(null)
+            onDHandler.push(null)
+
+            pitch.push(999)
+            roll.push(999)
+            yaw.push(999)
+        }
     }
 }
 
 /////////////////
 // END INCLUDE //
 /////////////////
-
-
-EtTiltpad.setTiltpadCount(9)
